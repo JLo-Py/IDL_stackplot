@@ -11,7 +11,7 @@ end
 
 
 ;====================================================================================
-PRO plot_st_stackplot, st_stackplot, srange=srange, trange=trange, min_time=min_time, max_time=max_time, dmin=dmin, dmax=dmax, log=log, channel=channel, true=true, isotropic=isotropic, charsize=charsize, charthick=charthick, thick=thick, xstyle=xstyle, ystyle=ystyle, xmargin=xmargin, ymargin=ymargin, xticks=xticks, yticks=yticks, xminor=xminor, yminor=yminor, xtickname=xtickname, ytickname=ytickname, xtickinterval=xtickinterval, ytickinterval=ytickinterval, interval=interval, xticklen=xticklen, yticklen=yticklen, xtitle=xtitle, ytitle=ytitle, title=title, inverse=inverse, no_erase=no_erase, erase=erase, no_transpose=no_transpose, reverse=reverse, seconds=seconds, boxcar=boxcar, nan=nan, edge_truncate=edge_truncate, bgcs=bgcs, bgts=bgts, consm=consm, xedge=xedge, yedge=yedge, sob=sob, sharp=sharp, cmask=cmask    ;, t_offset=t_offset
+PRO plot_st_stackplot, st_stackplot, srange=srange, trange=trange, min_time=min_time, max_time=max_time, dmin=dmin, dmax=dmax, log=log, sqrt=sqrt, channel=channel, true=true, isotropic=isotropic, charsize=charsize, charthick=charthick, thick=thick, xstyle=xstyle, ystyle=ystyle, xmargin=xmargin, ymargin=ymargin, xticks=xticks, yticks=yticks, xminor=xminor, yminor=yminor, xtickname=xtickname, ytickname=ytickname, xtickinterval=xtickinterval, ytickinterval=ytickinterval, interval=interval, xticklen=xticklen, yticklen=yticklen, xtitle=xtitle, ytitle=ytitle, title=title, inverse=inverse, no_erase=no_erase, erase=erase, no_transpose=no_transpose, reverse=reverse, seconds=seconds, boxcar=boxcar, nan=nan, edge_truncate=edge_truncate, position=position, full_labels=full_labels;, t_offset=t_offset
 
 ;INPUT
 ;--------------------
@@ -84,22 +84,17 @@ PRO plot_st_stackplot, st_stackplot, srange=srange, trange=trange, min_time=min_
 ;				- added handling of MIN_TIME and MAX_TIME with times only (does not require date)
 ;2018-02-06	JD		- added checks for min_time, max_time being strings
 ;2018-02-22	JD		- Original MIN_TIME and MAX_TIME are now stored and returned (so that the input keyword is not overwritten)
+;2022-04-21	JD		- changed default charsize to !p.charsize
+;				- some checks regarding time formats
+;2025-01-21	JD		- implemented TRUE=3/CHANNEL for X displays
+;2025-03-20	JD		- implemented POSITION
+;
+;2025-07-01	JD		- disabled the -1 in the line #202:   NTI = n_elements(tind);-1
+;				  (why was it even there?!)
+;2025-11-24	JD		- added SQRT
+;2026-01-15	JD		- changed label plotting to contain seconds
+;				  added keyword FULL_LABELS (labels now contain seconds)
 
-;2019-11-25     JL              - added a bunch of keywords which can be used for post-processing of the input stackplot
-;                               - USAGE:
-
-;                               - First, use image filters based on convolution, esentially controlled by two keywords: consm and cmask
-;                               - consm: before the image is convolved with an arbitrary kernel, it is smoothed with a boxcar
-;                               - cmask: when set, the images from the convolution and the original ones are normalized, added, and normalized again
-;                               - sharp: kernel for making the image sharper, has very similar effect to the Laplacian function
-;                               - xedge: kernel for detection of edges along the Y direction 
-;                               - yedge: kernel for detection of edges along the X direction 
-;                               - sobel: combines the latter two using a built-in function in IDL
-
-;                               - One can then use some background subtraction: 
-;                               - bgts: for each position along the cut, the BG averaged along all times is subtracted 
-;                               - bgcs: for each time, the BG averaged along the cut is subtracted 
-    
 
 scoord		= st_stackplot.scoord
 tcoord		= st_stackplot.tcoord
@@ -120,6 +115,8 @@ if keyword_set(min_time) then begin
   if (strmid(min_time, 0, 11) EQ ' 1-Jan-1979') then strput, min_time, strmid(tcoord[0], 0, 11), 0
   if (min_time LT min(tcoord)) or (min_time GT max(tcoord)) then begin
 ; 	print, ''
+ 	print, (min_time LT min(tcoord)), '  ', min_time, '  ', min(tcoord)
+ 	print, (min_time GT max(tcoord)), '  ', min_time, '  ', max(tcoord)
 	print, '-!-  PLOT_ST_STACKPLOT:  INCORRECT time range: MIN_TIME'
 	print, ''
 ; 	stop
@@ -135,6 +132,8 @@ if keyword_set(max_time) then begin
   if (strmid(max_time, 0, 11) EQ ' 1-Jan-1979') then strput, max_time, strmid(tcoord[n_elements(tcoord)-1], 0, 11), 0
   if (max_time GT max(tcoord)) or (max_time LT min(tcoord)) then begin
 ; 	print, ''
+	print, (max_time GT max(tcoord)), '  ', max_time, '  ', max(tcoord)
+	print, (max_time LT min(tcoord)), '  ', max_time, '  ', min(tcoord)
 	print, '-!-  PLOT_ST_STACKPLOT:  INCORRECT time range: MAX_TIME'
 	print, ''
 ; 	stop
@@ -156,6 +155,9 @@ if keyword_set(interval) and keyword_set(ytickinterval) then begin
 endif
 if keyword_set(interval) and not(keyword_set(ytickinterval)) then ytickinterval = interval
 
+
+
+
 ; if not(keyword_set(ds))		then ds		= (deriv(scoord))[0]
 if not(keyword_set(srange)) 	then srange	= [min(scoord)-ds/2d, max(scoord)+ds/2d]
 if not(keyword_set(min_time)) 	then min_time	= time_px_shift(min(tcoord), dt, /subtract)
@@ -165,7 +167,7 @@ if not(keyword_set(max_time)) 	then max_time	= time_px_shift(max(tcoord), dt, /a
 
 if not(keyword_set(charthick))	then charthick	= 1 +(!D.name EQ 'PS')
 if not(keyword_set(thick))	then thick	= 1 +(!D.name EQ 'PS')
-if not(keyword_set(charsize))	then charsize	= 1.25
+if not(keyword_set(charsize))	then charsize	= !p.charsize
 if not(keyword_set(thick))	then thick	= 2
 ; if not(keyword_set(dmin))	then dmin	= min(int_st)
 ; if not(keyword_set(dmax))	then dmax	= max(int_st)
@@ -188,100 +190,8 @@ if not(keyword_set(ytitle))	then begin
  if keyword_set(seconds) 	then ytitle	= 'Time from the '+min_time+' [s]' else ytitle	= 'Time [UT]'
 endif
 if not(keyword_set(title))	then title	= ''
-
-if not(keyword_set(consm))	then consm	= 1
-
 ;add xtickinterval, ytickinterval here?
 
-if keyword_set(xedge) or keyword_set(yedge) or keyword_set(sharp) then begin 
-
-    proc = int_st
-    
-    kernel = fltarr(3,3)
-
-    if keyword_set(xedge) then kernel = [[-1, 0, 1],[-2, 0, 2],[-1, 0, 1]]      ;kernels depend on various functions
-    if keyword_set(yedge) then kernel = [[ 1, 2, 1],[ 0, 0, 0],[-1,-2,-1]]
-    if keyword_set(sharp) then kernel = [[-1,-1,-1],[-1, 8,-1],[-1,-1,-1]]
-    
-    print, kernel 
-    
-    proc = convol(smooth(proc, [consm,consm]), kernel)
-    proc = shift(proc, 0, 3)                            ; smoothes the shift of the processed image, which probably originates in the 3x3 conv. kernel 
-    
-    if keyword_set(cmask) then begin 
-    
-        proc    = proc+abs(min(proc))                   ; make it positive 
-        nproc   = proc/max(proc)
-        norig   = int_st/max(int_st)
-        new_st  = nproc + norig
-        new_st  = new_st/max(new_st)                    ; normalization to 1.0
-        proc    = new_st
-        
-        print, 'The output stackplot has been normalized'
-
-    endif 
-    
-    int_st = proc 
-    
-endif 
-
-if keyword_set(sob) then begin
-
-    proc=sobel(int_st)
-    
-    if keyword_set(cmask) then begin 
-    
-        proc    = proc+abs(min(proc))                   
-        nproc   = proc/max(proc)
-        norig   = int_st/max(int_st)
-        new_st  = nproc + norig
-        new_st  = new_st/max(new_st)                 
-        proc    = new_st
-        
-        print, 'The output stackplot has been normalized'
-
-    endif 
-    
-    int_st = proc 
-
-endif 
-
-
-if keyword_set(bgts) then begin
-
-    proc = int_st
-
-    nc=n_elements(proc(*,0))    
-    means=fltarr(nc)
-    
-    for i=0, nc-1 do begin           
-    
-        means[i] = mean(proc(i,*), /nan)          
-        proc[i,*] = proc[i,*] - means[i]   
-        
-    endfor 
-    
-    int_st = proc
-        
-endif 
-
-if keyword_set(bgcs) then begin
-
-    proc = int_st
-    
-    nt=n_elements(proc(0,*))
-    means=fltarr(nt)
-  
-    for i=0, nt-1 do begin                
-    
-        means[i] = mean(proc(*,i), /nan)          
-        proc[*,i] = proc[*,i] - means[i]   
-        
-    endfor 
-    
-    int_st = proc
-    
-endif 
 
 
 ;we no longer need trange, min_time and max_time should now be properly defined.
@@ -296,9 +206,9 @@ tind		= where((time_px_shift(tcoord, dt, /subtract) GE min_time) $
 scoord		= scoord[sind]
 tcoord		= tcoord[tind]
 NXI		= n_elements(sind)
-NTI		= n_elements(tind)-1
+NTI		= n_elements(tind);-1
 
-if keyword_set(true) then begin 
+if keyword_set(true) and (!D.name EQ 'PS') then begin 
   dimension_array	= [1,0,2]			; for no_transpose
   if keyword_set(boxcar) then begin
 ; 	int_st	= smooth(int_st[sind[0]:sind[NXI-1],tind[0]:tind[NTI-1],*], boxcar)
@@ -309,14 +219,15 @@ if keyword_set(true) then begin
   endif else begin
 	int_st	= int_st[sind[0]:sind[NXI-1],tind[0]:tind[NTI-1],*]
   endelse
-endif else begin
+endif
+if not(keyword_set(true)) or (!D.name EQ 'X') then begin
   dimension_array	= [1,0]
   if keyword_set(boxcar) then begin
 	int_st	= smooth(int_st[sind[0]:sind[NXI-1],tind[0]:tind[NTI-1]], boxcar, nan=nan, edge_truncate=edge_truncate)
   endif else begin
 	int_st	= int_st[sind[0]:sind[NXI-1],tind[0]:tind[NTI-1]]
   endelse
-endelse
+endif
 
 if keyword_set(reverse) then begin
 ;   srange = reverse(srange)
@@ -403,7 +314,11 @@ IF keyword_set(no_transpose) THEN BEGIN
         days		= (min_time.time +it*double(ytickinterval)*1d3) / (3600L *1000L *24L)
         ytickname[it]	= anytim({mjd:min_time.mjd+days, time:min_time.time +it*double(ytickinterval)*1d3 - (3600L *1000L *24L *long(days))}, out_style='vms')
       endelse
-        ytickname[it] 	= strmid(ytickname[it], 12, 5)
+         if keyword_set(full_labels) then begin
+	  ytickname[it] 	= strmid(ytickname[it], 12, 5)
+	endif else begin
+	  ytickname[it] 	= strmid(ytickname[it], 12, 8)
+	endelse
     endfor
   endif
 ENDIF ELSE BEGIN
@@ -423,7 +338,11 @@ ENDIF ELSE BEGIN
         days		= (min_time.time +it*double(xtickinterval)*1d3) / (3600L *1000L *24L)
         xtickname[it]	= anytim({mjd:min_time.mjd+days, time:min_time.time +it*double(xtickinterval)*1d3 - (3600L *1000L *24L *long(days))}, out_style='vms')
       endelse
-        xtickname[it] 	= strmid(xtickname[it], 12, 5)
+        if keyword_set(full_labels) then begin
+	  xtickname[it] 	= strmid(xtickname[it], 12, 5)
+	endif else begin
+	  xtickname[it] 	= strmid(xtickname[it], 12, 8)
+	endelse
     endfor
   endif
 ENDELSE
@@ -432,7 +351,7 @@ ENDELSE
 if keyword_set(no_transpose) then begin
 
 	plot, 	/nodata, /norm, [srange[0], srange[1]], [0d, tmax-tmin], 		$
-				xrange=xrange,						$
+				xrange=xrange, position=position,			$
 				xstyle=xstyle, ystyle=ystyle,				$
 		charsize=charsize, charthick=charthick, /noerase,			$
 		thick=thick, xthick=thick, ythick=thick, isotropic=isotropic,		$
@@ -463,6 +382,7 @@ if keyword_set(no_transpose) then begin
 		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
 	endelse
 	endif
+
 	if (!D.name EQ 'X') then begin
 	if (keyword_set(log)) then begin
 		tv, bytscl(congrid(C*(alog10(int_st > (dmin) < (dmax))),				$
@@ -478,10 +398,42 @@ if keyword_set(no_transpose) then begin
 		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
 	endelse
 	endif
+	; if (!D.name EQ 'X') then begin
+	;  if keyword_set(true) then begin
+	;   dimension_array = dimension_array[0:1]
+	;   if (keyword_set(log)) then begin
+	; 	tv, bytscl(congrid(C*(alog10(transpose(int_st, dimension_array) > (dmin) < (dmax))),	$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*alog10(dmin2)), max=(C*alog10(dmax2)), /nan),  channel=channel,		$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endif else begin
+	; 	tv, bytscl(congrid(C*(transpose(int_st, dimension_array) > (dmin) < (dmax)),		$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*(dmin2)), max=(C*(dmax2)), /nan), channel=channel,			$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endelse
+	;  endif else begin
+	;   if (keyword_set(log)) then begin
+	; 	tv, bytscl(congrid(C*(alog10(transpose(int_st, dimension_array) > (dmin) < (dmax))),	$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*alog10(dmin2)), max=(C*alog10(dmax2)), /nan),  channel=channel,		$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endif else begin
+	; 	tv, bytscl(congrid(C*(transpose(int_st, dimension_array) > (dmin) < (dmax)),		$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*(dmin2)), max=(C*(dmax2)), /nan), channel=channel,			$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endelse
+	;  endelse  
+	; endif
 
 
 	plot, 	/nodata, /norm, [srange[0], srange[1]], [0d, tmax-tmin], 		$
-				xrange=xrange,						$
+				xrange=xrange, position=position,			$
 				xstyle=xstyle, ystyle=ystyle,				$
 		charsize=charsize, charthick=charthick, /noerase,			$
 		thick=thick, xthick=thick, ythick=thick, isotropic=isotropic,		$
@@ -493,7 +445,7 @@ if keyword_set(no_transpose) then begin
 endif else begin
 
 	plot, 	/nodata, /norm, [0d, tmax-tmin], [srange[0], srange[1]], 		$
-				yrange=yrange,						$
+				yrange=yrange, position=position,			$
 				xstyle=xstyle, ystyle=ystyle,				$
 		charsize=charsize, charthick=charthick, /noerase,			$
 		thick=thick, xthick=thick, ythick=thick, isotropic=isotropic,		$
@@ -512,36 +464,85 @@ endif else begin
 	endelse
 
 	if (!D.name EQ 'PS') then begin
-	if (keyword_set(log)) then begin
+	  if (keyword_set(log) and NOT(keyword_set(sqrt))) then begin
 		tv, bytscl(C*(alog10(transpose(int_st[*,*,*], dimension_array) > (dmin) < (dmax))),	$
 			min=(C*alog10(dmin2)), max=(C*alog10(dmax2)), /nan),  				$
 		lower_left(0,0), lower_left(1,0), /device, true=true,					$
 		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
-	endif else begin
+	  endif
+	  if (keyword_set(sqrt) and NOT(keyword_set(log))) then begin
+		tv, bytscl(C*(sqrt(transpose(int_st[*,*,*], dimension_array) > (dmin) < (dmax))),	$
+			min=(C*sqrt(dmin2)), max=(C*sqrt(dmax2)), /nan),  				$
+		lower_left(0,0), lower_left(1,0), /device, true=true,					$
+		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	  endif
+	  if NOT(keyword_set(log)) and NOT(keyword_set(sqrt)) then begin
 		tv, bytscl(C*(transpose(int_st[*,*,*], dimension_array) > (dmin) < (dmax)),		$
 			min=(C*(dmin2)), max=(C*(dmax2)), /nan), 					$
 		lower_left(0,0), lower_left(1,0), /device, true=true,					$
 		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
-	endelse
+	  endif
 	endif
+
 	if (!D.name EQ 'X') then begin
-	if (keyword_set(log)) then begin
+	  if (keyword_set(log) and NOT(keyword_set(sqrt))) then begin
 		tv, bytscl(congrid(C*(alog10(transpose(int_st, dimension_array) > (dmin) < (dmax))),	$
 				upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
 			min=(C*alog10(dmin2)), max=(C*alog10(dmax2)), /nan),  channel=channel,		$
 		lower_left(0,0), lower_left(1,0), /device,						$
 		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
-	endif else begin
+	  endif 
+	if (keyword_set(sqrt) and NOT(keyword_set(log))) then begin
+		tv, bytscl(congrid(C*(sqrt(transpose(int_st, dimension_array) > (dmin) < (dmax))),	$
+				upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+			min=(C*sqrt(dmin2)), max=(C*sqrt(dmax2)), /nan),  channel=channel,		$
+		lower_left(0,0), lower_left(1,0), /device,						$
+		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	  endif 
+	  if NOT(keyword_set(log)) and NOT(keyword_set(sqrt)) then begin
 		tv, bytscl(congrid(C*(transpose(int_st, dimension_array) > (dmin) < (dmax)),		$
 				upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
 			min=(C*(dmin2)), max=(C*(dmax2)), /nan), channel=channel,			$
 		lower_left(0,0), lower_left(1,0), /device,						$
 		xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
-	endelse
+	  endif 
 	endif
 
+	; if (!D.name EQ 'X') then begin
+	;  if keyword_set(true) then begin
+	;   dimension_array = dimension_array[0:1]
+	;   if (keyword_set(log)) then begin
+	; 	tv, bytscl(congrid(C*(alog10(transpose(int_st, dimension_array) > (dmin) < (dmax))),	$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*alog10(dmin2)), max=(C*alog10(dmax2)), /nan),  channel=channel,		$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endif else begin
+	; 	tv, bytscl(congrid(C*(transpose(int_st, dimension_array) > (dmin) < (dmax)),		$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*(dmin2)), max=(C*(dmax2)), /nan), channel=channel,			$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endelse
+	;  endif else begin
+	;   if (keyword_set(log)) then begin
+	; 	tv, bytscl(congrid(C*(alog10(transpose(int_st, dimension_array) > (dmin) < (dmax))),	$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*alog10(dmin2)), max=(C*alog10(dmax2)), /nan),  channel=channel,		$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endif else begin
+	; 	tv, bytscl(congrid(C*(transpose(int_st, dimension_array) > (dmin) < (dmax)),		$
+	; 			upper_right(0,0)-lower_left(0,0)+1, upper_right(1,0)-lower_left(1,0)+1),$
+	; 		min=(C*(dmin2)), max=(C*(dmax2)), /nan), channel=channel,			$
+	; 	lower_left(0,0), lower_left(1,0), /device,						$
+	; 	xsize=upper_right(0,0)-lower_left(0,0)+1, ysize=upper_right(1,0)-lower_left(1,0)+1
+	;   endelse
+	;  endelse  
+	; endif
+
 	plot, 	/nodata, /norm, [0d, tmax-tmin], [srange[0], srange[1]], 		$
-				yrange=yrange,						$
+				yrange=yrange, position=position,			$
 				xstyle=xstyle, ystyle=ystyle,				$
 		charsize=charsize, charthick=charthick, /noerase,			$
 		thick=thick, xthick=thick, ythick=thick, isotropic=isotropic,		$

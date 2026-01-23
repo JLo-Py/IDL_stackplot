@@ -7,7 +7,7 @@
 ;cut_Y			- Y position of the CUT [2-element vector if /straight_cut] (optionally named slit_y)
 
 ;OPTIONAL INPUT
-;min_time, max_time	- time constraints. If either not set, the beginning/end of the
+;min_time, max_time	- time constraints. If either not set, the beginning/end of the 
 ; 			  map time series will be assumed.
 ;straight_cut		- if set, the Cut_X and Cut_Y should be 2-element vectors
 ;			  if they are not, this program will cut the vector into 2 elements only
@@ -16,7 +16,7 @@
 ;			  -!- ST_STACKPLOT: only one of these keywords should be set
 ;			  SLIT_WIDTH [arc sec]			- half-width of the slit
 ;			  SLIT_PIX   [pixels, in DS units]	- the width of the slit is 2*slit_pix +1 in px units
-;
+;			
 ;
 ;boxcar			- smoothes AIA data with the given boxcar value before producing the stackplot
 ;/SPLINE		- if set, splines over the cut nodes to create a smooth curve
@@ -47,12 +47,12 @@
 ;2014-03-10	JD 	- written
 ;2014-08-05	JD	- corrected scoord if slit is in the Solar X direction
 ;2014-10-19	JD	- added option to input Slit_X and Slit_Y directly
-; 			  added keyword /straight_slit: if set, the Slit_X and Slit_Y
+; 			  added keyword /straight_slit: if set, the Slit_X and Slit_Y 
 ; 			    should be 2-element vectors as was expected till now
 ;			- rewritten the handling of maps spanning different dayap
 ;2014-11-21	JD	- added tag DT: temporal resolution of the plot
 ;			  calculated as the median of the time resolution
-;2014-12-04	JD 	- coordinates now as a function of the map index;
+;2014-12-04	JD 	- coordinates now as a function of the map index; 
 ;			  this has to be done as some maps in a series
 ;			  may be shifted (e.g., have different XC)
 ;			- added keyword FAST to skip this.
@@ -94,10 +94,11 @@
 ;			- added not(is_string(min_time & max_time)) to these keyword checks
 ;2018-02-22	JD	- added median(deriv(time.time))/2d (half-time resolution) to MIN_TIME, MAX_TIME checks
 ;			- Original MIN_TIME and MAX_TIME are now stored and returned (so that the input keyword is not overwritten)
-;2018-07-23	JD	- removed the 'stop' command if both SLIT_WIDTH and SLIT_PIX are set
+;2018-07-23	JD	- removed the 'stop' command if both SLIT_WIDTH and SLIT_PIX are set 
 ;			  (was producing an error in combination with stackplots.pro
 ;			   since the slit_pix was set in first stackplot then propagated to the oter 2)
 ;
+;2025-11-28 JL - coordinates extrated from the middle input map, not the first one, because it errors for long datasets
 ;
 ; NOTES TO SELF
 ;
@@ -110,14 +111,14 @@ function ST_STACKPLOT, map, cut_x=cut_x, cut_y=cut_y, min_time=min_time, max_tim
 			slit_width=slit_width, slit_pix=slit_pix, xap=xap, yap=yap
 
 t0		= systime(/seconds)
-
+			
 
 ;COORDINATE PROCESSING AND CHECKS
 ;-----------------------------------------------
-get_map_coord, map[0], xm, ym
+NMAP		= n_elements(map[*].id)
+get_map_coord, map[fix(NMAP/2)], xm, ym
 NX		= n_elements(map[0].data[*,0])
 NY		= n_elements(map[0].data[0,*])
-; NMAP		= n_elements(map[*].id)
 DX		= map[0].dx
 DY		= map[0].dy
 
@@ -149,7 +150,7 @@ if not(keyword_set(cut_X)) or not(keyword_set(cut_Y)) 	$
 	print, ''
 	print, '-!- ST_STACKPLOT:  Malformed or missing cut_X or cut_Y coordinates'
 	print, ''
-	stop
+	stop	
 endif
 
 cut_X	 	= double(cut_X)
@@ -166,11 +167,11 @@ endif
 
 
 ; if /straight_cut is set, treat the cut as if it has only 2 points
-if keyword_set(straight_cut) then begin
+if keyword_set(straight_cut) then begin	
   print, '% ST_STACKPLOT: Treating cut as if it has only 2 nodes '
   cut_X		= cut_X[0:1]
   cut_y		= cut_Y[0:1]
-endif
+endif 
 
 if keyword_set(straight_cut) and (cut_X[0] GT cut_X[1]) then begin
 	cut_X	= reverse(cut_X)
@@ -247,7 +248,7 @@ endif
 ; 	max_time.mjd	= min_time.mjd
 ; 	max_time.time	= max_time.time +3600L* 1000L* 24L
 ; endif
-;
+; 
 ; ;more than one day?
 ; if (max_time.mjd GE min_time.mjd +2L) then begin
 ; 	print, ''
@@ -320,7 +321,7 @@ endif else begin
 	  a		= (cut_Y[1] -cut_Y[0]) / (cut_X[1] -cut_X[0])
 	  b		=  cut_Y[0] -a*cut_X[0]
 	  dst		= sqrt( (cut_X[0] -cut_X[1])^2d +(cut_Y[0] -cut_Y[1])^2d )
-	  DS		= 1d /sqrt( ((cos(atan(a)))/DX)^2d +((sin(atan(a)))/DY)^2d )
+	  DS		= 1d /sqrt( ((cos(atan(a)))/DX)^2d +((sin(atan(a)))/DY)^2d ) 
 ; 	  npx		= fix(dst /DS) +1
 	  npx		= fix(dst /DS +0.5d) +1
 	  phi		= replicate(atan(a), npx)
@@ -342,8 +343,8 @@ endif else begin
 	  if (cut_y[1] LT cut_Y[0]) then sgn = -1d
 	  xp		= replicate(cut_X[0], npx)
 	  yp		= sgn *DY *dindgen(npx) +cut_Y[0]
-
-	  if keyword_set(straight_cut) or (n_elements(cut_y) EQ 2) then begin
+	  
+	  if keyword_set(straight_cut) or (n_elements(cut_y) EQ 2) then begin	  
 	    scoord	= DY *dindgen(npx) +cut_Y[0]
 	  endif else begin
 	    scoord	= DY *dindgen(npx)
@@ -352,9 +353,9 @@ endif else begin
 	  DS		= DY
   	  phi		= replicate(sgn *!dpi/2d, npx)
 	endelse
-
+	
 ; 	;correct cut_x[1], cut_y[1]
-; 	if (cut_X[1] NE xp[n_elements(xp)-1]) or (cut_Y[1] NE yp[n_elements(yp)-1]) then begin
+; 	if (cut_X[1] NE xp[n_elements(xp)-1]) or (cut_Y[1] NE yp[n_elements(yp)-1]) then begin 
 ; 	  print, '% ST_STACKPLOT: Correcting cut_X[1]   from ' $
 ; 		+trim(cut_X[1])+' to '+trim(xp[n_elements(xp)-1])
 ; 	  print, '% ST_STACKPLOT: Correcting cut_Y[1]   from ' $
@@ -362,8 +363,8 @@ endif else begin
 ; 	  cut_X[1]	= xp[n_elements(xp)-1]
 ; 	  cut_Y[1]	= yp[n_elements(yp)-1]
 ;          endif
-
-
+  
+  
 	; does the cut have more than 2 points?
 	; if yes, perform the analogous segment calculation for the next segments
 	; note this part of the code does not get executed if /straight_cut is set
@@ -375,23 +376,23 @@ endif else begin
 
 	    ;use the last xp and yp as the start for the next segment
 	    ;(this modifies the cut node location by less than 1 pixel)
-	    if (cut_X[isegment-1] NE xp[n_elements(xp)-1]) or (cut_Y[isegment-1] NE yp[n_elements(yp)-1]) then begin
+	    if (cut_X[isegment-1] NE xp[n_elements(xp)-1]) or (cut_Y[isegment-1] NE yp[n_elements(yp)-1]) then begin 
 	      print, '% ST_STACKPLOT: Correcting cut_X['+trim(isegment-1)+']   from ' $
 			+trim(cut_X[isegment-1])+' to '+trim(xp[n_elements(xp)-1])
 	      print, '% ST_STACKPLOT: Correcting cut_Y['+trim(isegment-1)+']   from ' $
 			+trim(cut_Y[isegment-1])+' to '+trim(yp[n_elements(yp)-1])
-
+			
 	      cut_X[isegment-1]	= xp[n_elements(xp)-1]
 	      cut_Y[isegment-1]	= yp[n_elements(yp)-1]
             endif
-
+	
 	    sgn 	= +1d
 
 	    ;now proceed analogously to the first segment
 	    ;but keep the DS from the first segment for consistency
 	    if (cut_X[isegment-1] NE cut_X[isegment]) then begin
 
-		if (cut_x[isegment] LT cut_x[isegment-1]) then sgn=-1d
+		if (cut_x[isegment] LT cut_x[isegment-1]) then sgn=-1d 
 
 		a	= (cut_Y[isegment] -cut_Y[isegment-1]) / (cut_X[isegment] -cut_X[isegment-1])
 		b	=  cut_Y[isegment-1] -a*cut_X[isegment-1]
@@ -400,17 +401,17 @@ endif else begin
 		npx2	= fix(dst /DS +0.5d) +1
 		scoord	= [scoord, 		max(scoord) +(dindgen(npx2-1)+1d) *DS]
 		phi	= [phi,			replicate(atan(a), npx2-1)]
-
+	    
 		if (cut_Y[isegment-1] EQ cut_Y[isegment]) then begin
 		  scoord= scoord +cut_X[isegment-1]
-		endif
+		endif	
 		xp	= [xp, 			sgn *DX *(dindgen(npx2-1)+1d) *cos(phi[npx]) +cut_X[isegment-1] ]
 		yp	= [yp, 			sgn *DY *(dindgen(npx2-1)+1d) *sin(phi[npx]) +cut_Y[isegment-1] ]
 	    endif else begin
 
 	    ;vertical cuts
 		if (cut_Y[isegment] LT cut_y[isegment-1]) then sgn =-1d
-
+		
 		npx2	= fix(abs(Cut_Y[isegment] -Cut_Y[isegment-1]) /DS +0.5d) +1
 		xp	= [xp, 			replicate(cut_X[isegment-1], npx2-1)]
 		yp	= [yp, 			sgn *DS *(dindgen(npx2-1)+1d) +cut_Y[isegment-1] ]
@@ -419,13 +420,13 @@ endif else begin
 	    endelse
 	    npx		= npx +npx2 -1
   	  endfor
-
+  	  
 	endif else begin
 	  isegment = 2
-	endelse
-
+	endelse 
+	
 	; finally, correct the last node of the cut
-	if (cut_X[isegment-1] NE xp[n_elements(xp)-1]) or (cut_Y[isegment-1] NE yp[n_elements(yp)-1]) then begin
+	if (cut_X[isegment-1] NE xp[n_elements(xp)-1]) or (cut_Y[isegment-1] NE yp[n_elements(yp)-1]) then begin 
 	  print, '% ST_STACKPLOT: Correcting cut_X['+trim(isegment-1)+']   from ' $
 		+trim(cut_X[isegment-1])+' to '+trim(xp[n_elements(xp)-1])
 	  print, '% ST_STACKPLOT: Correcting cut_Y['+trim(isegment-1)+']   from ' $
@@ -448,7 +449,7 @@ if keyword_set(slit_pix) then begin
 
   xap		= dblarr(npx,2*slit_pix+1)
   yap		= dblarr(npx,2*slit_pix+1)
-
+  
   for i=0, npx-1, 1 do begin
    for j=-slit_pix, +slit_pix, 1 do begin
 	xap[i,j+slit_pix]	= xp[i] +j*DS*sin(phi[i])
@@ -468,24 +469,24 @@ stack_slit	= dblarr(npx,NSLIT_PIX,NTIMES)
 
 
 
-;STACKPLOTS
+;STACKPLOTS 
 ;-----------------------------------------------
 
 dt			= median(deriv(time.time))/1d3
 out			= { stackplot:dblarr(npx,NTIMES),   id:map[0].id, tcoord:map[ind_t].time, dt:dt, 		$
 			    scoord:scoord, ds:ds, xp:xp, yp:yp, cut_x:cut_x, cut_y:cut_y, spline:keyword_set(spline), 	$
 			    xap:xap, yap:yap, slit_width:slit_width}
-
+									
 for it=0, NTIMES-1, 1 do begin
   if NOT(keyword_set(FAST)) then get_map_coord, map[ind_t[it]], xm, ym
-  if not(keyword_set(boxcar)) then begin
+  if not(keyword_set(boxcar)) then begin 
 ;     out.stackplot[*,it] = interpolate(map[ind_t[it]].data, $
 ; 				      interpol(dindgen(NX), xm[*,0],xp), $
 ; 				      interpol(dindgen(NY), ym[0,*],yp) )
     for j=0, NSLIT_PIX-1 do begin
       stack_slit[*,j,it]= interpolate(map[ind_t[it]].data, $
 				      interpol(dindgen(NX), xm[*,0], xap[*,j]), $
-				      interpol(dindgen(NY), ym[0,*], yap[*,j]) )
+				      interpol(dindgen(NY), ym[0,*], yap[*,j]) )   
     endfor
   endif else begin
 ;     out.stackplot[*,it] = interpolate(smooth(map[ind_t[it]].data, boxcar), $
@@ -494,7 +495,7 @@ for it=0, NTIMES-1, 1 do begin
     for j=0, NSLIT_PIX-1 do begin
       stack_slit[*,j,it]= interpolate(smooth(map[ind_t[it]].data, boxcar, nan=nan, edge_truncate=edge_truncate), $
 				      interpol(dindgen(NX), xm[*,0], xap[*,j]), $
-				      interpol(dindgen(NY), ym[0,*], yap[*,j]) )
+				      interpol(dindgen(NY), ym[0,*], yap[*,j]) )   
     endfor
   endelse
 ;   out.stackplot[*,it] = total(stack_slit[*,*,it], 2, /double)/double(NSLIT_PIX)

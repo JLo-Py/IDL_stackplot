@@ -1,21 +1,19 @@
-pro stackplot_cursor, stackplot=stackplot, min_time=min_time, max_time=max_time, $
- 			line_x=line_x, line_y=line_y, vel=vel, d_vel=d_vel, int_line=int_line, int_avg=int_avg, d_int_avg=d_int_avg, plot=plot, no_transpose=no_transpose, quiet=quiet, soho=soho, color=color, linestyle=linestyle, ds=ds, dt=dt, text_out=text_out, text_color=text_color, boxcar=boxcar, line_width=line_width, line_pix=line_pix
+pro STACKPLOT_CURSOR_I, stackplot=stackplot, min_time=min_time, max_time=max_time, $
+ 			line_x=line_x, line_y=line_y, vel=vel, d_vel=d_vel, plot=plot, no_transpose=no_transpose, quiet=quiet, soho=soho, color=color, linestyle=linestyle, ds=ds, dt=dt, text_out=text_out, text_color=text_color, boxcar=boxcar, line_width=line_width, line_pix=line_pix, line_int = line_int, line_d_int = line_d_int
 
 ;PURPOSE
 ;  To measure velocities from plot_st_stackplot
 ;  by point & click using mouse cursor
 ;
 ;INPUT
-;  ST_STACKPLOT			- (keyword, optional) Stackplot if one want the intensities
+;  None
 ;
 ;OPTIONAL INPUT
-;  Transpose			- (keyword) has to be set if the plot_st_stackplot used it.
+;Transpose			- (keyword) has to be set if the plot_st_stackplot used it.
 ;				  Othwerise returns 1/v instead of v
-;  SOHO				- (keyword) set if the stackplots are generated from SOHO data
+;SOHO				- (keyword) set if the stackplots are generated from SOHO data
 ;				  or other instrument at L1; since then the arc second is slightly shorter
-;  Quiet			- (keyword) set if you don't want any console output
-;  Line_x, line_y		- Line coordinates 
-;				  (can be used for intensity output along various stripes)
+;Quiet				- (keyword) set if you don't want any console output
 ;
 ;OUTPUT
 ;  None
@@ -28,9 +26,6 @@ pro stackplot_cursor, stackplot=stackplot, min_time=min_time, max_time=max_time,
 ;  STACKPLOT			- variable containing the stackplot if intensities are to be extracted
 ;  BOXCAR			- smoothing in the STACKPLOT_CURSOR
 ;  LINE_PIX			- how many pixels in the calculation of intensities
-;  INT_LINE			- intensities along the line
-;  INT_AVG			- average intensity along line
-;  D_INT_AVG			- uncertainty of the above
 ;
 ;PROGRAMMING NOTES
 ;  1) Note that the program expects to be used after STACKPLOT_CURSOR.
@@ -71,10 +66,8 @@ pro stackplot_cursor, stackplot=stackplot, min_time=min_time, max_time=max_time,
 ;2025-07-17	JD		- added back-conversion of min_time, max_time at the end of the program
 ;
 ;2025-08-12	JD		- changed calculation of grid points for /LINE_PIX
-;2025-08-14	JD		- added output intensity +- stddev  for center line 
-;2026-01-08	JD		- changed LINE_X and LINE_Y as optional input
-;2026-01-13 	JD		- added int_line as output,
-;				  along with int_avg, d_int_avg
+
+
 
 if 	keyword_set(soho)	then arcsec2km = 718. else arcsec2km = 725.
 if not(keyword_set(color))	then color=255
@@ -193,13 +186,6 @@ if keyword_set(stackplot) then begin
 	int_st	= int_st[sind[0]:sind[NXI-1],tind[0]:tind[NTI-1]]
     endelse
   endif
-  
-  if keyword_set(line_x) or keyword_set(line_y) then begin
-    if n_elements(line_x) NE n_elements(line_y) then begin
-      print, '-!- ST_STACKPLOT:  Malformed input:  Line_x, line_y'
-      stop
-    endif
-  endif
 
   ; if keyword_set(reverse) then begin
   ; ;   srange = reverse(srange)
@@ -266,33 +252,26 @@ endif
 ; Here we produce & plot the line
 ; (clicking on the plotted stackplot)
 ;------------------------------------
-if NOT(keyword_set(line_x)) and NOT(keyword_set(line_y)) then begin			; 2026-01-08
+jumpBegin:
+delvarx, line_x, line_y
 
-  jumpBegin:
-  delvarx, line_x, line_y
+!mouse.button = 0
+i=0	& x=dblarr(100) 	& y=dblarr(100)
 
-  !mouse.button = 0
-  i=0	& x=dblarr(100) 	& y=dblarr(100)
-
-  while (!mouse.button NE 4) do begin
-  ;   print, !mouse.button
-    if (!mouse.button EQ 2) then begin
-      goto, jumpBegin 
-    endif else begin
-      cursor, xc, yc, /data
-      x[i]=xc & y[i] = yc
-      plots, x[i], y[i], psym=1, /data
-      if (i GE 1) then plots, x[i-1:i], y[i-1:i], /data, color=color, linestyle=linestyle
-      i=i+1 & wait, 0.2
-    endelse
-  endwhile
-  line_X=x[0:i-2]
-  line_Y=y[0:i-2]
-
-endif
-
-; i = 3
-i = n_elements(line_x)+1
+while (!mouse.button NE 4) do begin
+;   print, !mouse.button
+  if (!mouse.button EQ 2) then begin
+    goto, jumpBegin 
+  endif else begin
+    cursor, xc, yc, /data
+    x[i]=xc & y[i] = yc
+    plots, x[i], y[i], psym=1, /data
+    if (i GE 1) then plots, x[i-1:i], y[i-1:i], /data, color=color, linestyle=linestyle
+    i=i+1 & wait, 0.2
+  endelse
+endwhile
+line_X=x[0:i-2]
+line_Y=y[0:i-2]
 
 ; if keyword_set(vertical) then line_X[1:-1] = line_X[0]
 
@@ -481,32 +460,30 @@ for j=0, i-3, 1 do begin
   
     if not(keyword_set(quiet))	then begin
     
- 	print, '; Intensity for segment '+trim(j+1) +' is '+string(average(int_line), format='(F9.2)') +' DN/s' + $
-    	       '   +- '  +string(stddev(int_line), format='(F9.2)') +' DN/s'
+ 	print, '; Intensity for segment '+trim(j+1) +' is '+string(average(int_line), format='(F9.2)') +' DN' + $
+    	       '   +- '  +string(stddev(int_line), format='(F9.2)') +' DN'
     
     	; now average over the slit width if necessary
     	if (NSLIT_PIX GT 1) then begin
     	  out_int_line 	= total(int_line, 2, /double)/double(NSLIT_PIX)
-    	  print, '; Intensity for segment '+trim(j+1) +' is '+string(average(out_int_line), format='(F9.2)') +' DN/s' + $
-    	         '   +- ' +string(stddev(out_int_line), format='(F9.2)')+' DN/s'
-    	         
-    	  print, '; Intensity for segment '+trim(j+1) +' is '+string(average(int_line[*,line_pix]), format='(F9.2)') +' DN/s' + $
-    	       '   +- '  +string(stddev(int_line[*,line_pix]), format='(F9.2)') +' DN/s  -- Center line only'       
+    	  print, '; Intensity for segment '+trim(j+1) +' is '+string(average(out_int_line), format='(F9.2)') +' DN' + $
+    	         '   +-  ' +string(stddev(out_int_line), format='(F9.2)')+' DN'
         endif else begin
-          out_int_line 	= int_line
+          out_int_line 	= average(int_line)
+          out_int_line_e = stddev(int_line)
         endelse
-        
-        int_avg		= average(int_line)
-        d_int_avg	= stddev(int_line)
 
-    	str_int_line	= ';  int_line = ['
-    	for ipx=0, npx-2, 1 do begin
-    	  str_int_line= str_int_line +trim(string(out_int_line[ipx], format='(F9.2)'))+', '
-    	endfor
-    	str_int_line	= str_int_line +trim(string(out_int_line[ipx], format='(F9.2)'))+']'
+      line_int = out_int_line
+      line_d_int = out_int_line_e
+
+    	; str_int_line	= ';  int_line = ['
+    	; for ipx=0, npx-2, 1 do begin
+    	;   str_int_line= str_int_line +trim(string(out_int_line[ipx], format='(F9.2)'))+', '
+    	; endfor
+    	; str_int_line	= str_int_line +trim(string(out_int_line[ipx], format='(F9.2)'))+']'
   
-    	print, str_int_line
-        print, '; '
+    	; print, str_int_line
+      ;   print, '; '
     endif
   endif  
   
@@ -539,7 +516,9 @@ endif
 
 
 ; convert back
-min_time	= anytim(min_time, out_style='vms')
-max_time	= anytim(max_time, out_style='vms')
- 
+if keyword_set(max_time) then begin
+  min_time	= anytim(min_time, out_style='vms')
+  max_time	= anytim(max_time, out_style='vms')
+endif  
+
 end
