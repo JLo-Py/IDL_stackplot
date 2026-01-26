@@ -69,9 +69,9 @@ plot_st_stackplot, outxt, dmin=dmin, dmax=dmax, /log, min_time=min_time_xt, max_
 ; 7. Measure velocities using linear fits, use 5 lines by default. Adjust spatial/temporal resolution if needed. Same mouse logic as before.
 
 n_l = 5
-ds_iris = 0.33
-dt_iris = 2
+ 
 
+ 
 lines_x=dblarr(n_l,2)
 lines_y=dblarr(n_l,2)
 
