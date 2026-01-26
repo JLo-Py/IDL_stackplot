@@ -71,7 +71,7 @@ plot_st_stackplot, outxt, dmin=dmin, dmax=dmax, /log, min_time=min_time_xt, max_
 n_l = 5
  
 
- 
+
 lines_x=dblarr(n_l,2)
 lines_y=dblarr(n_l,2)
 
@@ -83,7 +83,7 @@ for i=0, n_elements(vels)-1 do begin        & $
     stackplot_cursor, stackplot = outxt, min_time = min_time_xt, max_time = max_time_xt,line_x=line_x, line_y=line_y, vel=vel, d_vel=d_vel & $
     lines_x(i,*)=line_x & $
     lines_y(i,*)=line_y & $
-    xyouts, line_x(1)-20, line_y(1)+1, ''+string(i)+'', color=0, charsize=2, charthick=2 & $
+    xyouts, line_x(1)-5, line_y(1)+1, ''+string(i)+'', color=0, charsize=2, charthick=2 & $
     vels(i)=vel & $
     d_vels(i)=d_vel  & $
 endfor
